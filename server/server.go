@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"errors"
+	"go-rest/database"
+	"go-rest/repository"
 	"log"
 	"net/http"
 
@@ -10,8 +12,8 @@ import (
 )
 
 type Config struct {
-	Port string
-	JWTSecret string
+	Port        string
+	JWTSecret   string
 	DatabaseUrl string
 }
 
@@ -24,11 +26,11 @@ type Broker struct {
 	router *mux.Router
 }
 
-func (b *Broker) Config() *Config{
+func (b *Broker) Config() *Config {
 	return b.config
 }
 
-func NewServer(ctx context.Context, config *Config)(*Broker, error){
+func NewServer(ctx context.Context, config *Config) (*Broker, error) {
 	if config.Port == "" {
 		return nil, errors.New("port is required")
 	}
@@ -43,16 +45,22 @@ func NewServer(ctx context.Context, config *Config)(*Broker, error){
 		config: config,
 		router: mux.NewRouter(),
 	}
-	return broker,nil
+	return broker, nil
 }
 
-func (b *Broker) Start(binder func (s Server, r *mux.Router)){
+func (b *Broker) Start(binder func(s Server, r *mux.Router)) {
 	b.router = mux.NewRouter()
 	binder(b, b.router)
 
-	log.Println("Starting server on port" , b.Config().Port)
+	repo, err := database.NewPostgresRepository(b.config.DatabaseUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	repository.SetRepository(repo)
 
-	if err := http.ListenAndServe(b.config.Port, b.router); err != nil{
+	log.Println("Starting server on port", b.Config().Port)
+
+	if err := http.ListenAndServe(b.config.Port, b.router); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
